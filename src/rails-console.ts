@@ -1,5 +1,6 @@
 import * as pty from 'node-pty';
 import { RailsConsoleConfig, ExecutionResult } from './types.js';
+import { formatRailsError } from './utils/error-parser.js';
 
 /**
  * Manages a persistent Rails console session using a pseudo-terminal (PTY).
@@ -136,13 +137,20 @@ export class RailsConsoleManager {
       // Wait for output with stabilization detection
       const maxWaitTime = this.config.timeout;
       const checkInterval = 100;
+      const warningThreshold = maxWaitTime * 0.5; // Warn at 50% of timeout
       let elapsed = 0;
       let outputStarted = false;
       let lastBufferLength = originalBufferLength;
+      let warningShown = false;
 
       while (elapsed < maxWaitTime) {
         await new Promise(resolve => setTimeout(resolve, checkInterval));
         elapsed += checkInterval;
+        
+        // Track if command is taking longer than expected
+        if (!warningShown && elapsed > warningThreshold) {
+          warningShown = true;
+        }
         
         const currentBufferLength = this.outputBuffer.length;
         if (currentBufferLength > lastBufferLength) {
@@ -161,6 +169,9 @@ export class RailsConsoleManager {
         }
       }
 
+      // Check if we timed out
+      const timedOut = elapsed >= maxWaitTime;
+
       // Extract just the command output
       let commandOutput = this.outputBuffer.slice(originalBufferLength);
       
@@ -177,16 +188,28 @@ export class RailsConsoleManager {
         })
         .join('\n');
 
-      const cleanOutput = this.cleanTerminalOutput(commandOutput);
+      let cleanOutput = this.cleanTerminalOutput(commandOutput);
       
       // Detect Rails errors in output
       const hasError = /\(.*\):\d+:in.*:.*\(.*Error\)/.test(cleanOutput) ||
                       /NameError|SyntaxError|ArgumentError|NoMethodError/.test(cleanOutput);
 
+      // Format error nicely if detected
+      if (hasError) {
+        cleanOutput = formatRailsError(cleanOutput);
+      }
+      
+      // Add timeout warning if command took too long
+      if (timedOut) {
+        cleanOutput = `⚠️ Command execution exceeded timeout (${maxWaitTime}ms). Partial output:\n\n${cleanOutput}`;
+      } else if (warningShown) {
+        cleanOutput = `⏱️ Command took ${elapsed}ms to complete (timeout: ${maxWaitTime}ms)\n\n${cleanOutput}`;
+      }
+
       return {
-        success: !hasError,
+        success: !hasError && !timedOut,
         output: cleanOutput || '(no output)',
-        error: hasError ? 'Rails error detected in output' : undefined,
+        error: hasError ? 'Rails error detected in output' : timedOut ? 'Command execution timeout' : undefined,
       };
 
     } catch (error) {

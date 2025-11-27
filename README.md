@@ -170,7 +170,7 @@ Result: => 15
 
 ### execute_rails_command
 
-Execute a command in the Rails console.
+Execute a single-line command in the Rails console.
 
 **Parameters:**
 - `command` (string, required): The Rails console command to execute
@@ -199,13 +199,53 @@ Execute a command in the Rails console.
 }
 ```
 
+### execute_rails_script
+
+Execute a multi-line Ruby script in the Rails console. Useful for complex operations, method definitions, or blocks of code.
+
+**Parameters:**
+- `script` (string, required): Multi-line Ruby script to execute
+
+**Examples:**
+
+```typescript
+// Multi-line script
+{
+  "script": "user = User.first\nputs user.email\nuser.update(name: 'New Name')"
+}
+
+// Method definition
+{
+  "script": "def greet(name)\n  puts \"Hello, #{name}!\"\nend\ngreet('World')"
+}
+```
+
+### check_rails_console_health
+
+Check if the Rails console is healthy and responsive. Executes a simple test command and measures response time.
+
+**Returns:**
+- `HEALTHY`: Console responds quickly (< 5s)
+- `DEGRADED`: Console responds but slowly (5-10s)
+- `UNHEALTHY`: Console fails or very slow (> 10s)
+
+**Examples:**
+
+```typescript
+// Check health
+{}
+```
+
 ## Features & Safety
 
 1. **Persistent Session**: Variables and state persist between commands for efficient workflow
-2. **Timeout Protection**: Commands timeout after 30 seconds (configurable via `COMMAND_TIMEOUT`)
-3. **Error Handling**: Clear error messages for common issues
-4. **Process Management**: Automatic cleanup on server shutdown
-5. **PTY Support**: Uses pseudo-terminal for proper Rails console output (compatible with Rails 8+)
+2. **Multi-line Script Support**: Execute complex Ruby scripts with multiple lines
+3. **Health Monitoring**: Check console health and responsiveness
+4. **Timeout Protection**: Commands timeout after 30 seconds (configurable via `COMMAND_TIMEOUT`) with progress feedback
+5. **Error Parsing**: Beautifully formatted error messages with stack traces
+6. **Error Handling**: Clear error messages for common issues
+7. **Process Management**: Automatic cleanup on server shutdown
+8. **PTY Support**: Uses pseudo-terminal for proper Rails console output (compatible with Rails 8+)
 
 ## Troubleshooting
 
