@@ -1,4 +1,4 @@
-export interface RailsConsoleConfig {
+export interface RubyConsoleConfig {
   appPath: string;
   command: string;
   timeout: number;

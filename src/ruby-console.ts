@@ -1,24 +1,24 @@
 import * as pty from 'node-pty';
-import { RailsConsoleConfig, ExecutionResult } from './types.js';
-import { formatRailsError } from './utils/error-parser.js';
+import { RubyConsoleConfig, ExecutionResult } from './types.js';
+import { formatRubyError } from './utils/error-parser.js';
 
 /**
  * Manages a persistent console session (Rails console, IRB, or Racksh) using a pseudo-terminal (PTY).
  * This allows the console to run in TTY mode, which is required for proper output.
  */
-export class RailsConsoleManager {
+export class RubyConsoleManager {
   private process: pty.IPty | null = null;
-  private config: RailsConsoleConfig;
+  private config: RubyConsoleConfig;
   public outputBuffer: string = '';
   private isReady: boolean = false;
   private readonly MAX_BUFFER_SIZE = 1000000; // 1MB limit
 
-  constructor(config: RailsConsoleConfig) {
+  constructor(config: RubyConsoleConfig) {
     this.config = config;
   }
 
   /**
-   * Check if the Rails console is ready to accept commands.
+   * Check if the console is ready to accept commands.
    */
   get ready(): boolean {
     return this.isReady;
@@ -35,7 +35,7 @@ export class RailsConsoleManager {
         const command = commandParts[0];
         const args = commandParts.slice(1);
 
-        // Use PTY to create a pseudo-terminal (Rails needs TTY for output)
+        // Use PTY to create a pseudo-terminal (console needs TTY for output)
         this.process = pty.spawn(command, args, {
           name: 'xterm-color',
           cols: 80,
@@ -69,6 +69,15 @@ export class RailsConsoleManager {
             return;
           }
           
+          // Check for Rails 8+ prompt pattern (app-name(env)>)
+          if (/[\w-]+\([^)]+\)>\s*$/.test(this.outputBuffer)) {
+            clearInterval(checkReady);
+            this.isReady = true;
+            this.outputBuffer = ''; // Clear startup output
+            resolve();
+            return;
+          }
+          
           // Check for IRB prompt (irb(main):001:0> or irb(main):001>)
           if (/irb\([^)]+\):\d+[*:]?>/.test(this.outputBuffer)) {
             clearInterval(checkReady);
@@ -78,8 +87,17 @@ export class RailsConsoleManager {
             return;
           }
           
-          // Check for Racksh prompt (>> or similar)
-          if (this.outputBuffer.includes('>>') && this.outputBuffer.length > 10) {
+          // Check for simple IRB prompt (:001>)
+          if (/:\d+\s*>?\s*$/.test(this.outputBuffer)) {
+            clearInterval(checkReady);
+            this.isReady = true;
+            this.outputBuffer = ''; // Clear startup output
+            resolve();
+            return;
+          }
+          
+          // Check for Racksh prompt (>> at end of line)
+          if (/>>\s*$/.test(this.outputBuffer) && this.outputBuffer.length > 10) {
             clearInterval(checkReady);
             this.isReady = true;
             this.outputBuffer = ''; // Clear startup output
@@ -213,13 +231,13 @@ export class RailsConsoleManager {
 
       let cleanOutput = this.cleanTerminalOutput(commandOutput);
       
-      // Detect Rails errors in output
+      // Detect Ruby errors in output
       const hasError = /\(.*\):\d+:in.*:.*\(.*Error\)/.test(cleanOutput) ||
                       /NameError|SyntaxError|ArgumentError|NoMethodError/.test(cleanOutput);
 
       // Format error nicely if detected
       if (hasError) {
-        cleanOutput = formatRailsError(cleanOutput);
+        cleanOutput = formatRubyError(cleanOutput);
       }
       
       // Add timeout warning if command took too long
@@ -232,7 +250,7 @@ export class RailsConsoleManager {
       return {
         success: !hasError && !timedOut,
         output: cleanOutput || '(no output)',
-        error: hasError ? 'Rails error detected in output' : timedOut ? 'Command execution timeout' : undefined,
+        error: hasError ? 'Ruby error detected in output' : timedOut ? 'Command execution timeout' : undefined,
       };
 
     } catch (error) {

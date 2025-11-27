@@ -30,27 +30,27 @@ Create a configuration file or set environment variables:
 
 ### Environment Variables
 
-- `RAILS_APP_PATH`: Path to your Rails/Rack application (default: current directory). Optional if using Docker/remote commands or IRB.
-- `RAILS_CONSOLE_COMMAND`: Command to start console (default: `bundle exec rails c`). Can be Rails console, IRB, Racksh, or any Ruby REPL.
+- `RUBY_APP_PATH`: Path to your Rails/Rack application (default: current directory). Optional if using Docker/remote commands or IRB.
+- `RUBY_CONSOLE_COMMAND`: Command to start console (default: `bundle exec rails c`). Can be Rails console, IRB, Racksh, or any Ruby REPL.
 - `COMMAND_TIMEOUT`: Timeout for command execution in milliseconds (default: 30000)
 
 ### Example Configuration
 
 **Local Rails app:**
 ```bash
-export RAILS_APP_PATH=/path/to/your/rails/app
-export RAILS_CONSOLE_COMMAND="bundle exec rails c"
+export RUBY_APP_PATH=/path/to/your/rails/app
+export RUBY_CONSOLE_COMMAND="bundle exec rails c"
 ```
 
-**Docker (no RAILS_APP_PATH needed):**
+**Docker (no RUBY_APP_PATH needed):**
 ```bash
-export RAILS_CONSOLE_COMMAND="docker-compose exec -T web bundle exec rails c"
+export RUBY_CONSOLE_COMMAND="docker-compose exec -T web bundle exec rails c"
 ```
 
-**Running from Rails directory (no RAILS_APP_PATH needed):**
+**Running from Rails directory (no RUBY_APP_PATH needed):**
 ```bash
 # Just use default command, it will use current directory
-export RAILS_CONSOLE_COMMAND="bundle exec rails c"
+export RUBY_CONSOLE_COMMAND="bundle exec rails c"
 ```
 
 ### Custom Console Commands
@@ -59,31 +59,31 @@ You can customize the command used to start the console. Examples for Rails, IRB
 
 ```bash
 # Production environment
-RAILS_CONSOLE_COMMAND="bundle exec rails c production"
+RUBY_CONSOLE_COMMAND="bundle exec rails c production"
 
 # Sandbox mode (changes are rolled back)
-RAILS_CONSOLE_COMMAND="bundle exec rails c --sandbox"
+RUBY_CONSOLE_COMMAND="bundle exec rails c --sandbox"
 
-# Using Docker (no RAILS_APP_PATH needed)
-RAILS_CONSOLE_COMMAND="docker-compose exec -T web bundle exec rails c"
+# Using Docker (no RUBY_APP_PATH needed)
+RUBY_CONSOLE_COMMAND="docker-compose exec -T web bundle exec rails c"
 
-# Using Kubernetes (no RAILS_APP_PATH needed)
-RAILS_CONSOLE_COMMAND="kubectl exec -it rails-pod -- bundle exec rails c"
+# Using Kubernetes (no RUBY_APP_PATH needed)
+RUBY_CONSOLE_COMMAND="kubectl exec -it rails-pod -- bundle exec rails c"
 
 # Using specific Ruby version
-RAILS_CONSOLE_COMMAND="rbenv exec bundle exec rails c"
+RUBY_CONSOLE_COMMAND="rbenv exec bundle exec rails c"
 
-# Remote server via SSH (no RAILS_APP_PATH needed)
-RAILS_CONSOLE_COMMAND="ssh user@server 'cd /app && bundle exec rails c'"
+# Remote server via SSH (no RUBY_APP_PATH needed)
+RUBY_CONSOLE_COMMAND="ssh user@server 'cd /app && bundle exec rails c'"
 
 # IRB (standalone Ruby)
-RAILS_CONSOLE_COMMAND="irb"
+RUBY_CONSOLE_COMMAND="irb"
 
 # Racksh (Rack console)
-RAILS_CONSOLE_COMMAND="bundle exec racksh"
+RUBY_CONSOLE_COMMAND="bundle exec racksh"
 ```
 
-**Note**: When using Docker, Kubernetes, or remote commands, you typically don't need to set `RAILS_APP_PATH` since the command itself handles the context.
+**Note**: When using Docker, Kubernetes, or remote commands, you typically don't need to set `RUBY_APP_PATH` since the command itself handles the context.
 
 ## Usage with MCP Clients
 
@@ -102,14 +102,14 @@ Add to your Claude Desktop configuration file:
       "command": "node",
       "args": ["/path/to/ruby-console-mcp/build/index.js"],
       "env": {
-        "RAILS_APP_PATH": "/path/to/your/rails/app"
+        "RUBY_APP_PATH": "/path/to/your/rails/app"
       }
     }
   }
 }
 ```
 
-**Docker (no RAILS_APP_PATH needed):**
+**Docker (no RUBY_APP_PATH needed):**
 ```json
 {
   "mcpServers": {
@@ -117,7 +117,7 @@ Add to your Claude Desktop configuration file:
       "command": "node",
       "args": ["/path/to/ruby-console-mcp/build/index.js"],
       "env": {
-        "RAILS_CONSOLE_COMMAND": "docker-compose exec -T web bundle exec rails c"
+        "RUBY_CONSOLE_COMMAND": "docker-compose exec -T web bundle exec rails c"
       }
     }
   }
@@ -174,12 +174,12 @@ Result: => 15
 
 ## Available Tools
 
-### execute_rails_command
+### execute_ruby_command
 
 Execute a single-line command in the console (Rails console, IRB, or Racksh).
 
 **Parameters:**
-- `command` (string, required): The Rails console command to execute
+- `command` (string, required): The console command to execute
 
 **Examples:**
 
@@ -205,7 +205,7 @@ Execute a single-line command in the console (Rails console, IRB, or Racksh).
 }
 ```
 
-### execute_rails_script
+### execute_ruby_script
 
 Execute a multi-line Ruby script in the console. Useful for complex operations, method definitions, or blocks of code.
 
@@ -226,7 +226,7 @@ Execute a multi-line Ruby script in the console. Useful for complex operations, 
 }
 ```
 
-### check_rails_console_health
+### check_ruby_console_health
 
 Check if the console is healthy and responsive. Executes a simple test command and measures response time.
 
@@ -242,16 +242,45 @@ Check if the console is healthy and responsive. Executes a simple test command a
 {}
 ```
 
+### connect_ruby_console
+
+Connect to the Ruby console. Starts the console if it is not already running. Returns the connection status and console information.
+
+**Parameters:**
+- None
+
+**Examples:**
+
+```typescript
+// Connect to console
+{}
+```
+
+### disconnect_ruby_console
+
+Disconnect from the Ruby console. Stops the console process and releases resources. All variables and state will be lost after disconnecting.
+
+**Parameters:**
+- None
+
+**Examples:**
+
+```typescript
+// Disconnect from console
+{}
+```
+
 ## Features & Safety
 
 1. **Persistent Session**: Variables and state persist between commands for efficient workflow
 2. **Multi-line Script Support**: Execute complex Ruby scripts with multiple lines
 3. **Health Monitoring**: Check console health and responsiveness
-4. **Timeout Protection**: Commands timeout after 30 seconds (configurable via `COMMAND_TIMEOUT`) with progress feedback
-5. **Error Parsing**: Beautifully formatted error messages with stack traces
-6. **Error Handling**: Clear error messages for common issues
-7. **Process Management**: Automatic cleanup on server shutdown
-8. **PTY Support**: Uses pseudo-terminal for proper Rails console output (compatible with Rails 8+)
+4. **Connection Management**: Connect and disconnect from console manually
+5. **Timeout Protection**: Commands timeout after 30 seconds (configurable via `COMMAND_TIMEOUT`) with progress feedback
+6. **Error Parsing**: Beautifully formatted error messages with stack traces
+7. **Error Handling**: Clear error messages for common issues
+8. **Process Management**: Automatic cleanup on server shutdown
+9. **PTY Support**: Uses pseudo-terminal for proper Rails console output (compatible with Rails 8+)
 
 ## Troubleshooting
 
@@ -260,9 +289,9 @@ Check if the console is healthy and responsive. Executes a simple test command a
 **Problem**: "Failed to start console"
 
 **Solutions**:
-- Verify `RAILS_APP_PATH` points to a valid Rails application
+- Verify `RUBY_APP_PATH` points to a valid Rails application
 - Run `bundle install` in your Rails application directory
-- Check that `RAILS_CONSOLE_COMMAND` is correct for your setup
+- Check that `RUBY_CONSOLE_COMMAND` is correct for your setup
 - Ensure all dependencies are installed
 
 ### Commands Timeout
@@ -320,14 +349,14 @@ npm start
 └────────┬────────┘
          │
 ┌────────▼────────┐
-│ Rails Console   │
+│ Ruby Console    │
 │    Manager      │
-│ (rails-console) │
+│ (ruby-console)  │
 └────────┬────────┘
          │ PTY (pseudo-terminal)
 ┌────────▼────────┐
-│ Rails Console   │
-│  (rails c)      │
+│ Ruby Console    │
+│  (rails c/irb)  │
 └─────────────────┘
 ```
 
@@ -335,7 +364,7 @@ npm start
 
 - This tool provides powerful access to your Rails application
 - All commands are executed immediately without confirmation
-- Consider running in sandbox mode for testing: `RAILS_CONSOLE_COMMAND="bundle exec rails c --sandbox"`
+- Consider running in sandbox mode for testing: `RUBY_CONSOLE_COMMAND="bundle exec rails c --sandbox"`
 - Be cautious in production environments
 - Review commands carefully before execution
 - Consider implementing additional access controls based on your needs

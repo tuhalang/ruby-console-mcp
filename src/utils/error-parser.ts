@@ -1,5 +1,5 @@
 /**
- * Parses Rails error messages and formats them nicely.
+ * Parses Ruby error messages and formats them nicely.
  */
 
 interface ParsedError {
@@ -12,9 +12,9 @@ interface ParsedError {
 }
 
 /**
- * Parse a Rails error from console output.
+ * Parse a Ruby error from console output.
  */
-function parseRailsError(output: string): ParsedError | null {
+function parseRubyError(output: string): ParsedError | null {
   // Pattern: (ClassName):line:in 'method': message (ErrorType)
   // Example: (NameError):4:in `<main>': undefined local variable or method `a' for main
   const errorPattern = /\(([^)]+)\):(\d+):in\s+['"]([^'"]+)['"]:\s*(.+?)(?:\s+\(([^)]+)\))?/;
@@ -88,10 +88,10 @@ function formatError(error: ParsedError): string {
 }
 
 /**
- * Check if output contains a Rails error and format it nicely.
+ * Check if output contains a Ruby error and format it nicely.
  */
-export function formatRailsError(output: string): string {
-  const parsed = parseRailsError(output);
+export function formatRubyError(output: string): string {
+  const parsed = parseRubyError(output);
   
   if (parsed) {
     return formatError(parsed);

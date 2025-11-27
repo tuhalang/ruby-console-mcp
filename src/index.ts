@@ -6,18 +6,18 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { RailsConsoleManager } from './rails-console.js';
-import { RailsConsoleConfig } from './types.js';
+import { RubyConsoleManager } from './ruby-console.js';
+import { RubyConsoleConfig } from './types.js';
 
 // Load configuration from environment variables
-const config: RailsConsoleConfig = {
+const config: RubyConsoleConfig = {
   appPath: process.env.RUBY_APP_PATH || process.cwd(), // Defaults to current directory
   command: process.env.RUBY_CONSOLE_COMMAND || 'bundle exec rails c',
   timeout: parseInt(process.env.COMMAND_TIMEOUT || '30000', 10),
 };
 
-// Initialize Rails console manager
-const consoleManager = new RailsConsoleManager(config);
+// Initialize console manager
+const consoleManager = new RubyConsoleManager(config);
 
 // Create MCP server
 const server = new Server(
@@ -37,10 +37,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: 'execute_rails_command',
+        name: 'execute_ruby_command',
         description:
-          'Execute a single-line command in the Rails console. The Rails console allows you to interact with ' +
-          'your Rails application, query models, inspect data, and execute Ruby code in the ' +
+          'Execute a single-line command in the Ruby console (Rails console, IRB, or Racksh). The console allows you to interact with ' +
+          'your Ruby/Rails application, query models, inspect data, and execute Ruby code in the ' +
           'context of your application. Commands are executed in a persistent session, so ' +
           'variables and state are preserved between commands.',
         inputSchema: {
@@ -49,16 +49,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             command: {
               type: 'string',
               description:
-                'The Rails console command to execute (e.g., "User.count", "Post.first", "a = 1 + 2").',
+                'The console command to execute (e.g., "User.count", "Post.first", "a = 1 + 2").',
             },
           },
           required: ['command'],
         },
       },
       {
-        name: 'execute_rails_script',
+        name: 'execute_ruby_script',
         description:
-          'Execute a multi-line Ruby script in the Rails console. Useful for complex operations, ' +
+          'Execute a multi-line Ruby script in the console. Useful for complex operations, ' +
           'method definitions, or blocks of code. The script is executed as a single unit in the ' +
           'persistent session, so variables and state are preserved.',
         inputSchema: {
@@ -67,7 +67,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             script: {
               type: 'string',
               description:
-                'Multi-line Ruby script to execute. Each line will be sent to the Rails console. ' +
+                'Multi-line Ruby script to execute. Each line will be sent to the console. ' +
                 'Example: "user = User.first\nputs user.email\nuser.update(name: \'New Name\')"',
             },
           },
@@ -75,10 +75,30 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: 'check_rails_console_health',
+        name: 'check_ruby_console_health',
         description:
-          'Check if the Rails console is healthy and responsive. Executes a simple test command ' +
+          'Check if the console is healthy and responsive. Executes a simple test command ' +
           'and measures response time. Returns health status: healthy, degraded, or unhealthy.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
+        name: 'connect_ruby_console',
+        description:
+          'Connect to the Ruby console. Starts the console if it is not already running. ' +
+          'Returns the connection status and console information.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
+        name: 'disconnect_ruby_console',
+        description:
+          'Disconnect from the Ruby console. Stops the console process and releases resources. ' +
+          'All variables and state will be lost after disconnecting.',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -92,7 +112,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  // Ensure Rails console is started (shared logic)
+  // Ensure console is started (shared logic)
   const ensureConsoleReady = async () => {
     try {
       if (!consoleManager.ready) {
@@ -105,10 +125,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             type: 'text',
             text: `Failed to start console: ${error instanceof Error ? error.message : String(error)}\n\n` +
                   `Make sure:\n` +
-                  `1. RAILS_APP_PATH is set correctly (current: ${config.appPath})\n` +
+                  `1. RUBY_APP_PATH is set correctly (current: ${config.appPath})\n` +
                   `2. Application exists at that path (if needed)\n` +
                   `3. Dependencies are installed (run 'bundle install' for Rails/Rack apps)\n` +
-                  `4. RAILS_CONSOLE_COMMAND is correct (current: ${config.command})`,
+                  `4. RUBY_CONSOLE_COMMAND is correct (current: ${config.command})`,
           },
         ],
         isError: true,
@@ -155,7 +175,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   };
 
-  if (name === 'execute_rails_command') {
+  // Support both new and old tool names for backward compatibility
+  if (name === 'execute_ruby_command' || name === 'execute_rails_command') {
     const command = args?.command as string;
 
     if (!command) {
@@ -168,7 +189,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return await executeAndReturn(command);
   }
 
-  if (name === 'execute_rails_script') {
+  if (name === 'execute_ruby_script' || name === 'execute_rails_script') {
     const script = args?.script as string;
 
     if (!script) {
@@ -178,11 +199,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const readyError = await ensureConsoleReady();
     if (readyError) return readyError;
 
-    // For multi-line scripts, execute as-is (Rails console handles multi-line input)
+    // For multi-line scripts, execute as-is (console handles multi-line input)
     return await executeAndReturn(script);
   }
 
-  if (name === 'check_rails_console_health') {
+  if (name === 'check_ruby_console_health' || name === 'check_rails_console_health') {
     const startTime = Date.now();
     
     // Check if console is ready
@@ -240,6 +261,89 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       ],
       isError,
     };
+  }
+
+  if (name === 'connect_ruby_console') {
+    try {
+      if (!consoleManager.ready) {
+        await consoleManager.start();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Console connected successfully.\n\n' +
+                    `Console Ready: ${consoleManager.ready ? 'Yes' : 'No'}\n` +
+                    `Command: ${config.command}\n` +
+                    `App Path: ${config.appPath}`,
+            },
+          ],
+        };
+      } else {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Console is already connected.\n\n' +
+                    `Console Ready: Yes\n` +
+                    `Command: ${config.command}\n` +
+                    `App Path: ${config.appPath}`,
+            },
+          ],
+        };
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to connect to console: ${error instanceof Error ? error.message : String(error)}\n\n` +
+                  `Make sure:\n` +
+                  `1. RUBY_APP_PATH is set correctly (current: ${config.appPath})\n` +
+                  `2. Application exists at that path (if needed)\n` +
+                  `3. Dependencies are installed (run 'bundle install' for Rails/Rack apps)\n` +
+                  `4. RUBY_CONSOLE_COMMAND is correct (current: ${config.command})`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  if (name === 'disconnect_ruby_console') {
+    try {
+      if (consoleManager.ready) {
+        await consoleManager.stop();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Console disconnected successfully.\n\n' +
+                    `Console Ready: ${consoleManager.ready ? 'Yes' : 'No'}`,
+            },
+          ],
+        };
+      } else {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Console is not connected.\n\n' +
+                    `Console Ready: No`,
+            },
+          ],
+        };
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to disconnect console: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+        isError: true,
+      };
+    }
   }
 
   throw new Error(`Unknown tool: ${name}`);
