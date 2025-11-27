@@ -13,8 +13,21 @@ A Model Context Protocol (MCP) server that provides access to Ruby console funct
 
 ## Installation
 
+### Option 1: Install via npm (Recommended)
+
+```bash
+# Install globally
+npm install -g ruby-console-mcp
+
+# Or use with npx (no installation needed)
+npx ruby-console-mcp
+```
+
+### Option 2: Install from source
+
 ```bash
 # Clone or navigate to the project directory
+git clone https://github.com/tuhalang/ruby-console-mcp.git
 cd ruby-console-mcp
 
 # Install dependencies
@@ -94,7 +107,36 @@ Add to your Claude Desktop configuration file:
 **MacOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows**: `%APPDATA%/Claude/claude_desktop_config.json`
 
-**Local Rails app:**
+**Using npm package (Recommended):**
+```json
+{
+  "mcpServers": {
+    "ruby-console": {
+      "command": "npx",
+      "args": ["-y", "ruby-console-mcp"],
+      "env": {
+        "RUBY_APP_PATH": "/path/to/your/rails/app"
+      }
+    }
+  }
+}
+```
+
+**Or using globally installed package:**
+```json
+{
+  "mcpServers": {
+    "ruby-console": {
+      "command": "ruby-console-mcp",
+      "env": {
+        "RUBY_APP_PATH": "/path/to/your/rails/app"
+      }
+    }
+  }
+}
+```
+
+**Local Rails app (from source):**
 ```json
 {
   "mcpServers": {
@@ -114,8 +156,8 @@ Add to your Claude Desktop configuration file:
 {
   "mcpServers": {
     "ruby-console": {
-      "command": "node",
-      "args": ["/path/to/ruby-console-mcp/build/index.js"],
+      "command": "npx",
+      "args": ["-y", "ruby-console-mcp"],
       "env": {
         "RUBY_CONSOLE_COMMAND": "docker-compose exec -T web bundle exec rails c"
       }
@@ -126,8 +168,17 @@ Add to your Claude Desktop configuration file:
 
 ### Other MCP Clients
 
-Use the stdio transport with the following command:
+**Using npm package:**
+```bash
+npx -y ruby-console-mcp
+```
 
+**Or if installed globally:**
+```bash
+ruby-console-mcp
+```
+
+**From source:**
 ```bash
 node /path/to/ruby-console-mcp/build/index.js
 ```
@@ -324,6 +375,13 @@ Disconnect from the Ruby console. Stops the console process and releases resourc
 ## Development
 
 ```bash
+# Clone the repository
+git clone https://github.com/tuhalang/ruby-console-mcp.git
+cd ruby-console-mcp
+
+# Install dependencies
+npm install
+
 # Watch mode for development
 npm run dev
 
@@ -333,6 +391,7 @@ npm run build
 # Start the server
 npm start
 ```
+
 
 ## Architecture
 

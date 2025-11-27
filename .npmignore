@@ -1,0 +1,36 @@
+# Source files
+src/
+*.ts
+!*.d.ts
+tsconfig.json
+
+# Development files
+test-ruby-console-command.sh
+TEST_RUBY_CONSOLE_COMMAND.md
+INTRO_POST_*.md
+run.sh
+
+# Build artifacts (keep build/ for published package)
+*.tsbuildinfo
+
+# Development
+.git/
+.gitignore
+.DS_Store
+*.log
+.env
+.preview/
+.rails-console-logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test files
+*.test.ts
+*.spec.ts
+__tests__/
+test/
+
