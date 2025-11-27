@@ -1,11 +1,11 @@
 {
-  "name": "rails-console-mcp",
+  "name": "ruby-console-mcp",
   "version": "1.0.0",
-  "description": "MCP server for Rails console interaction. Execute Rails commands through Model Context Protocol with persistent session support.",
+  "description": "MCP server for Ruby console interaction. Execute Rails console, IRB, or Racksh commands through Model Context Protocol with persistent session support.",
   "type": "module",
   "main": "build/index.js",
   "bin": {
-    "rails-console-mcp": "build/index.js"
+    "ruby-console-mcp": "build/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -15,8 +15,12 @@
   },
   "keywords": [
     "mcp",
+    "ruby",
     "rails",
+    "irb",
+    "racksh",
     "console",
+    "repl",
     "model-context-protocol"
   ],
   "author": "",

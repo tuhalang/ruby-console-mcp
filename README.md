@@ -1,21 +1,21 @@
-# Rails Console MCP Server
+# Ruby Console MCP Server
 
-A Model Context Protocol (MCP) server that provides access to Rails console functionality for AI assistants. Execute Rails commands, query models, and interact with your Rails application through natural language with persistent session support.
+A Model Context Protocol (MCP) server that provides access to Ruby console functionality for AI assistants. Execute Rails console, IRB, or Racksh commands, query models, and interact with your Ruby/Rails application through natural language with persistent session support.
 
 ## Features
 
-- 🚀 Execute Rails console commands through MCP
+- 🚀 Execute Rails console, IRB, or Racksh commands through MCP
 - 💾 Persistent session - variables and state are preserved between commands
-- ⚙️ Configurable Rails console command
+- ⚙️ Configurable console command (supports Rails, IRB, Racksh, or any Ruby REPL)
 - 🔌 Easy integration with MCP-compatible AI assistants (Claude, Cursor, etc.)
 - 📝 Clear error messages and helpful diagnostics
-- 🎯 Uses PTY for proper TTY support (works with Rails 8+)
+- 🎯 Uses PTY for proper TTY support (works with Rails 8+, IRB, Racksh)
 
 ## Installation
 
 ```bash
 # Clone or navigate to the project directory
-cd rails-console-mcp
+cd ruby-console-mcp
 
 # Install dependencies
 npm install
@@ -30,8 +30,8 @@ Create a configuration file or set environment variables:
 
 ### Environment Variables
 
-- `RAILS_APP_PATH`: Path to your Rails application (default: current directory). Optional if using Docker/remote commands.
-- `RAILS_CONSOLE_COMMAND`: Command to start Rails console (default: `bundle exec rails c`)
+- `RAILS_APP_PATH`: Path to your Rails/Rack application (default: current directory). Optional if using Docker/remote commands or IRB.
+- `RAILS_CONSOLE_COMMAND`: Command to start console (default: `bundle exec rails c`). Can be Rails console, IRB, Racksh, or any Ruby REPL.
 - `COMMAND_TIMEOUT`: Timeout for command execution in milliseconds (default: 30000)
 
 ### Example Configuration
@@ -53,9 +53,9 @@ export RAILS_CONSOLE_COMMAND="docker-compose exec -T web bundle exec rails c"
 export RAILS_CONSOLE_COMMAND="bundle exec rails c"
 ```
 
-### Custom Rails Console Commands
+### Custom Console Commands
 
-You can customize the command used to start the Rails console. Examples:
+You can customize the command used to start the console. Examples for Rails, IRB, and Racksh:
 
 ```bash
 # Production environment
@@ -75,6 +75,12 @@ RAILS_CONSOLE_COMMAND="rbenv exec bundle exec rails c"
 
 # Remote server via SSH (no RAILS_APP_PATH needed)
 RAILS_CONSOLE_COMMAND="ssh user@server 'cd /app && bundle exec rails c'"
+
+# IRB (standalone Ruby)
+RAILS_CONSOLE_COMMAND="irb"
+
+# Racksh (Rack console)
+RAILS_CONSOLE_COMMAND="bundle exec racksh"
 ```
 
 **Note**: When using Docker, Kubernetes, or remote commands, you typically don't need to set `RAILS_APP_PATH` since the command itself handles the context.
@@ -92,9 +98,9 @@ Add to your Claude Desktop configuration file:
 ```json
 {
   "mcpServers": {
-    "rails-console": {
+    "ruby-console": {
       "command": "node",
-      "args": ["/path/to/rails-console-mcp/build/index.js"],
+      "args": ["/path/to/ruby-console-mcp/build/index.js"],
       "env": {
         "RAILS_APP_PATH": "/path/to/your/rails/app"
       }
@@ -107,9 +113,9 @@ Add to your Claude Desktop configuration file:
 ```json
 {
   "mcpServers": {
-    "rails-console": {
+    "ruby-console": {
       "command": "node",
-      "args": ["/path/to/rails-console-mcp/build/index.js"],
+      "args": ["/path/to/ruby-console-mcp/build/index.js"],
       "env": {
         "RAILS_CONSOLE_COMMAND": "docker-compose exec -T web bundle exec rails c"
       }
@@ -123,18 +129,18 @@ Add to your Claude Desktop configuration file:
 Use the stdio transport with the following command:
 
 ```bash
-node /path/to/rails-console-mcp/build/index.js
+node /path/to/ruby-console-mcp/build/index.js
 ```
 
 ## How It Works
 
 ### Command Execution
 
-The server spawns a persistent Rails console process using a pseudo-terminal (PTY) and communicates with it via stdin/stdout. Commands are sent to the console, and responses are captured and returned to the AI assistant.
+The server spawns a persistent console process (Rails console, IRB, or Racksh) using a pseudo-terminal (PTY) and communicates with it via stdin/stdout. Commands are sent to the console, and responses are captured and returned to the AI assistant.
 
 ### Persistent Session
 
-The Rails console runs in a persistent session, which means:
+The console runs in a persistent session, which means:
 
 - **Variables persist**: Variables defined in one command are available in subsequent commands
 - **State is maintained**: ActiveRecord connections, loaded classes, and other state persist
@@ -170,7 +176,7 @@ Result: => 15
 
 ### execute_rails_command
 
-Execute a single-line command in the Rails console.
+Execute a single-line command in the console (Rails console, IRB, or Racksh).
 
 **Parameters:**
 - `command` (string, required): The Rails console command to execute
@@ -201,7 +207,7 @@ Execute a single-line command in the Rails console.
 
 ### execute_rails_script
 
-Execute a multi-line Ruby script in the Rails console. Useful for complex operations, method definitions, or blocks of code.
+Execute a multi-line Ruby script in the console. Useful for complex operations, method definitions, or blocks of code.
 
 **Parameters:**
 - `script` (string, required): Multi-line Ruby script to execute
@@ -222,7 +228,7 @@ Execute a multi-line Ruby script in the Rails console. Useful for complex operat
 
 ### check_rails_console_health
 
-Check if the Rails console is healthy and responsive. Executes a simple test command and measures response time.
+Check if the console is healthy and responsive. Executes a simple test command and measures response time.
 
 **Returns:**
 - `HEALTHY`: Console responds quickly (< 5s)
@@ -249,9 +255,9 @@ Check if the Rails console is healthy and responsive. Executes a simple test com
 
 ## Troubleshooting
 
-### Rails Console Won't Start
+### Console Won't Start
 
-**Problem**: "Failed to start Rails console"
+**Problem**: "Failed to start console"
 
 **Solutions**:
 - Verify `RAILS_APP_PATH` points to a valid Rails application

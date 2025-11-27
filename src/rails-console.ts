@@ -3,8 +3,8 @@ import { RailsConsoleConfig, ExecutionResult } from './types.js';
 import { formatRailsError } from './utils/error-parser.js';
 
 /**
- * Manages a persistent Rails console session using a pseudo-terminal (PTY).
- * This allows Rails console to run in TTY mode, which is required for proper output.
+ * Manages a persistent console session (Rails console, IRB, or Racksh) using a pseudo-terminal (PTY).
+ * This allows the console to run in TTY mode, which is required for proper output.
  */
 export class RailsConsoleManager {
   private process: pty.IPty | null = null;
@@ -25,7 +25,7 @@ export class RailsConsoleManager {
   }
 
   /**
-   * Start the Rails console process.
+   * Start the console process (Rails console, IRB, or Racksh).
    * Waits for the console to be fully loaded before resolving.
    */
   async start(): Promise<void> {
@@ -57,15 +57,34 @@ export class RailsConsoleManager {
           this.isReady = false;
         });
 
-        // Wait for the Rails console to be ready (check for startup messages)
+        // Wait for the console to be ready (check for startup messages or prompts)
         const checkReady = setInterval(() => {
-          // Check for any Rails environment loading message
+          // Check for Rails environment loading message
           if (this.outputBuffer.includes('Loading ') && 
               this.outputBuffer.includes(' environment')) {
             clearInterval(checkReady);
             this.isReady = true;
             this.outputBuffer = ''; // Clear startup output
             resolve();
+            return;
+          }
+          
+          // Check for IRB prompt (irb(main):001:0> or irb(main):001>)
+          if (/irb\([^)]+\):\d+[*:]?>/.test(this.outputBuffer)) {
+            clearInterval(checkReady);
+            this.isReady = true;
+            this.outputBuffer = ''; // Clear startup output
+            resolve();
+            return;
+          }
+          
+          // Check for Racksh prompt (>> or similar)
+          if (this.outputBuffer.includes('>>') && this.outputBuffer.length > 10) {
+            clearInterval(checkReady);
+            this.isReady = true;
+            this.outputBuffer = ''; // Clear startup output
+            resolve();
+            return;
           }
         }, 100);
 
@@ -74,7 +93,7 @@ export class RailsConsoleManager {
           clearInterval(checkReady);
           if (!this.isReady) {
             this.stop();
-            reject(new Error('Rails console startup timeout'));
+            reject(new Error('Console startup timeout'));
           }
         }, 30000);
       } catch (error) {
@@ -92,14 +111,18 @@ export class RailsConsoleManager {
     output = output.replace(/\x1B\[\?[0-9]*[a-zA-Z]/g, '');
     output = output.replace(/\x1B\[[0-9]*[A-G]/g, '');
     
-    // Remove prompt lines (Rails 8 format: app-name(env)> or traditional irb(main):001>)
+    // Remove prompt lines (Rails 8: app-name(env)>, IRB: irb(main):001>, Racksh: >>)
     const lines = output.split('\n');
     const cleanedLines = lines.filter(line => {
       const trimmed = line.trim();
-      // Skip prompt lines
+      // Skip Rails console prompts (app-name(env)>)
       if (/^[\w-]+\([^)]+\)>\s*$/.test(trimmed)) return false;
+      // Skip IRB prompts (irb(main):001:0> or irb(main):001>)
       if (/^irb\([^)]+\):\d+[*:]?>?\s*$/.test(trimmed)) return false;
+      // Skip simple IRB prompts (:001>)
       if (/^:\d+\s*>?\s*$/.test(trimmed)) return false;
+      // Skip Racksh prompts (>>)
+      if (/^>>\s*$/.test(trimmed)) return false;
       // Skip empty lines with just control characters
       if (/^[\s\u0000-\u001F]*$/.test(trimmed)) return false;
       return true;
@@ -113,10 +136,10 @@ export class RailsConsoleManager {
   }
 
   /**
-   * Execute a command in the Rails console.
+   * Execute a command in the console.
    * Uses output stabilization detection to determine when the command has finished.
    *
-   * @param command - The Rails console command to execute
+   * @param command - The console command to execute
    * @returns Promise resolving to the execution result
    */
   async execute(command: string): Promise<ExecutionResult> {
@@ -124,7 +147,7 @@ export class RailsConsoleManager {
       return {
         success: false,
         output: '',
-        error: 'Rails console is not ready',
+        error: 'Console is not ready',
       };
     }
 
@@ -222,7 +245,7 @@ export class RailsConsoleManager {
   }
 
   /**
-   * Stop the Rails console process.
+   * Stop the console process.
    */
   async stop(): Promise<void> {
     if (this.process) {
@@ -233,7 +256,7 @@ export class RailsConsoleManager {
   }
 
   /**
-   * Restart the Rails console process.
+   * Restart the console process.
    */
   async restart(): Promise<void> {
     await this.stop();

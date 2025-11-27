@@ -11,8 +11,8 @@ import { RailsConsoleConfig } from './types.js';
 
 // Load configuration from environment variables
 const config: RailsConsoleConfig = {
-  appPath: process.env.RAILS_APP_PATH || process.cwd(), // Defaults to current directory
-  command: process.env.RAILS_CONSOLE_COMMAND || 'bundle exec rails c',
+  appPath: process.env.RUBY_APP_PATH || process.cwd(), // Defaults to current directory
+  command: process.env.RUBY_CONSOLE_COMMAND || 'bundle exec rails c',
   timeout: parseInt(process.env.COMMAND_TIMEOUT || '30000', 10),
 };
 
@@ -22,7 +22,7 @@ const consoleManager = new RailsConsoleManager(config);
 // Create MCP server
 const server = new Server(
   {
-    name: 'rails-console-mcp',
+    name: 'ruby-console-mcp',
     version: '1.0.0',
   },
   {
@@ -103,11 +103,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         content: [
           {
             type: 'text',
-            text: `Failed to start Rails console: ${error instanceof Error ? error.message : String(error)}\n\n` +
+            text: `Failed to start console: ${error instanceof Error ? error.message : String(error)}\n\n` +
                   `Make sure:\n` +
                   `1. RAILS_APP_PATH is set correctly (current: ${config.appPath})\n` +
-                  `2. Rails application exists at that path\n` +
-                  `3. Bundle is installed (run 'bundle install' in the Rails app)\n` +
+                  `2. Application exists at that path (if needed)\n` +
+                  `3. Dependencies are installed (run 'bundle install' for Rails/Rack apps)\n` +
                   `4. RAILS_CONSOLE_COMMAND is correct (current: ${config.command})`,
           },
         ],
@@ -195,7 +195,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: `Health Check: UNHEALTHY\n\n` +
-                    `Rails console failed to start: ${error instanceof Error ? error.message : String(error)}`,
+                    `Console failed to start: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,
@@ -260,7 +260,7 @@ process.on('SIGTERM', async () => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('Rails Console MCP server running on stdio');
+  console.error('Ruby Console MCP server running on stdio');
 }
 
 main().catch((error) => {
