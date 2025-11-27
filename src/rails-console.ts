@@ -1,0 +1,220 @@
+import * as pty from 'node-pty';
+import { RailsConsoleConfig, ExecutionResult } from './types.js';
+
+/**
+ * Manages a persistent Rails console session using a pseudo-terminal (PTY).
+ * This allows Rails console to run in TTY mode, which is required for proper output.
+ */
+export class RailsConsoleManager {
+  private process: pty.IPty | null = null;
+  private config: RailsConsoleConfig;
+  public outputBuffer: string = '';
+  private isReady: boolean = false;
+  private readonly MAX_BUFFER_SIZE = 1000000; // 1MB limit
+
+  constructor(config: RailsConsoleConfig) {
+    this.config = config;
+  }
+
+  /**
+   * Check if the Rails console is ready to accept commands.
+   */
+  get ready(): boolean {
+    return this.isReady;
+  }
+
+  /**
+   * Start the Rails console process.
+   * Waits for the console to be fully loaded before resolving.
+   */
+  async start(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const commandParts = this.config.command.split(' ');
+        const command = commandParts[0];
+        const args = commandParts.slice(1);
+
+        // Use PTY to create a pseudo-terminal (Rails needs TTY for output)
+        this.process = pty.spawn(command, args, {
+          name: 'xterm-color',
+          cols: 80,
+          rows: 30,
+          cwd: this.config.appPath,
+          env: process.env,
+        });
+
+        this.process.onData((data: string) => {
+          this.outputBuffer += data;
+          // Prevent buffer from growing too large
+          if (this.outputBuffer.length > this.MAX_BUFFER_SIZE) {
+            // Keep only the last 500KB
+            this.outputBuffer = this.outputBuffer.slice(-500000);
+          }
+        });
+
+        this.process.onExit(({ exitCode, signal }) => {
+          this.isReady = false;
+        });
+
+        // Wait for the Rails console to be ready (check for startup messages)
+        const checkReady = setInterval(() => {
+          // Check for any Rails environment loading message
+          if (this.outputBuffer.includes('Loading ') && 
+              this.outputBuffer.includes(' environment')) {
+            clearInterval(checkReady);
+            this.isReady = true;
+            this.outputBuffer = ''; // Clear startup output
+            resolve();
+          }
+        }, 100);
+
+        // Timeout for startup
+        setTimeout(() => {
+          clearInterval(checkReady);
+          if (!this.isReady) {
+            this.stop();
+            reject(new Error('Rails console startup timeout'));
+          }
+        }, 30000);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Clean terminal output by removing ANSI escape codes, prompts, and excessive newlines.
+   */
+  private cleanTerminalOutput(output: string): string {
+    // Remove ANSI escape codes
+    output = output.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+    output = output.replace(/\x1B\[\?[0-9]*[a-zA-Z]/g, '');
+    output = output.replace(/\x1B\[[0-9]*[A-G]/g, '');
+    
+    // Remove prompt lines (Rails 8 format: app-name(env)> or traditional irb(main):001>)
+    const lines = output.split('\n');
+    const cleanedLines = lines.filter(line => {
+      const trimmed = line.trim();
+      // Skip prompt lines
+      if (/^[\w-]+\([^)]+\)>\s*$/.test(trimmed)) return false;
+      if (/^irb\([^)]+\):\d+[*:]?>?\s*$/.test(trimmed)) return false;
+      if (/^:\d+\s*>?\s*$/.test(trimmed)) return false;
+      // Skip empty lines with just control characters
+      if (/^[\s\u0000-\u001F]*$/.test(trimmed)) return false;
+      return true;
+    });
+    
+    output = cleanedLines.join('\n');
+    
+    // Remove excessive newlines
+    output = output.replace(/\n{3,}/g, '\n\n');
+    return output.trim();
+  }
+
+  /**
+   * Execute a command in the Rails console.
+   * Uses output stabilization detection to determine when the command has finished.
+   *
+   * @param command - The Rails console command to execute
+   * @returns Promise resolving to the execution result
+   */
+  async execute(command: string): Promise<ExecutionResult> {
+    if (!this.isReady || !this.process) {
+      return {
+        success: false,
+        output: '',
+        error: 'Rails console is not ready',
+      };
+    }
+
+    try {
+      const originalBufferLength = this.outputBuffer.length;
+      
+      // Send command
+      this.process.write(command + '\n');
+
+      // Wait for output with stabilization detection
+      const maxWaitTime = this.config.timeout;
+      const checkInterval = 100;
+      let elapsed = 0;
+      let outputStarted = false;
+      let lastBufferLength = originalBufferLength;
+
+      while (elapsed < maxWaitTime) {
+        await new Promise(resolve => setTimeout(resolve, checkInterval));
+        elapsed += checkInterval;
+        
+        const currentBufferLength = this.outputBuffer.length;
+        if (currentBufferLength > lastBufferLength) {
+          outputStarted = true;
+          lastBufferLength = currentBufferLength;
+        }
+        
+        // After output starts and we've waited at least 1 second, check for stabilization
+        if (outputStarted && elapsed > 1000) {
+          const beforeLength = this.outputBuffer.length;
+          await new Promise(resolve => setTimeout(resolve, 500));
+          // If no new data in 500ms, output is complete
+          if (this.outputBuffer.length === beforeLength) {
+            break;
+          }
+        }
+      }
+
+      // Extract just the command output
+      let commandOutput = this.outputBuffer.slice(originalBufferLength);
+      
+      // Remove the echoed command line (more robust detection)
+      const commandLines = command.split('\n');
+      const lines = commandOutput.split('\n');
+      commandOutput = lines
+        .filter(line => {
+          // Skip if line exactly matches the command or is a prompt
+          const trimmed = line.trim();
+          if (commandLines.some(cmd => trimmed === cmd.trim())) return false;
+          if (/^[\w-]+\([^)]+\)>\s*$/.test(trimmed)) return false;
+          return true;
+        })
+        .join('\n');
+
+      const cleanOutput = this.cleanTerminalOutput(commandOutput);
+      
+      // Detect Rails errors in output
+      const hasError = /\(.*\):\d+:in.*:.*\(.*Error\)/.test(cleanOutput) ||
+                      /NameError|SyntaxError|ArgumentError|NoMethodError/.test(cleanOutput);
+
+      return {
+        success: !hasError,
+        output: cleanOutput || '(no output)',
+        error: hasError ? 'Rails error detected in output' : undefined,
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        output: '',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Stop the Rails console process.
+   */
+  async stop(): Promise<void> {
+    if (this.process) {
+      this.process.kill();
+      this.process = null;
+      this.isReady = false;
+    }
+  }
+
+  /**
+   * Restart the Rails console process.
+   */
+  async restart(): Promise<void> {
+    await this.stop();
+    await this.start();
+  }
+}
+

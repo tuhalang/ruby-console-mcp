@@ -1,0 +1,33 @@
+{
+  "name": "rails-console-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Rails console interaction. Execute Rails commands through Model Context Protocol with persistent session support.",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "rails-console-mcp": "build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
+    "start": "node build/index.js",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "mcp",
+    "rails",
+    "console",
+    "model-context-protocol"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  }
+}
+
