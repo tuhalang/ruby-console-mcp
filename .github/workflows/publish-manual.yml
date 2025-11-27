@@ -65,17 +65,21 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           git tag "v$VERSION"
-          git push origin main master --tags || git push origin master --tags || true
+          git push origin HEAD --tags
+
+      - name: Get version
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v$(node -p "require('./package.json').version")
-          name: Release v$(node -p "require('./package.json').version")
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
           body: |
             ## Changes
             - Manual release from GitHub Actions
-            - Version: $(node -p "require('./package.json').version")
+            - Version: ${{ steps.version.outputs.version }}
           draft: false
           prerelease: false
         env:
